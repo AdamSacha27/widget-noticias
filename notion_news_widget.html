@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notion News Widget</title>
+    <!-- Inter Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        notion: {
+                            light: '#ffffff',
+                            'light-bg': '#f7f7f5',
+                            'light-hover': '#efefed',
+                            'light-border': '#e9e9e7',
+                            'light-text': '#37352f',
+                            'light-muted': '#787774',
+                            
+                            dark: '#191919',
+                            'dark-bg': '#202020',
+                            'dark-hover': '#2c2c2c',
+                            'dark-border': '#2f2f2f',
+                            'dark-text': '#d3d3d3',
+                            'dark-muted': '#9b9b9b',
+                            
+                            accent: '#2eaadc',
+                            'accent-hover': '#0081b5',
+                            red: '#eb5757',
+                            yellow: '#dfab01',
+                            green: '#0f7b6c'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Custom scrollbar for Notion-like clean look */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(135, 131, 120, 0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(135, 131, 120, 0.4);
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-notion-light-bg dark:bg-notion-dark text-notion-light-text dark:text-notion-dark-text min-h-screen font-sans antialiased selection:bg-blue-500/20 transition-colors duration-200 p-2 sm:p-4">
+
+    <div id="app" class="max-w-4xl mx-auto rounded-xl border border-notion-light-border dark:border-notion-dark-border bg-notion-light dark:bg-notion-dark-bg shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+        
+        <header class="p-3 sm:p-4 border-b border-notion-light-border dark:border-notion-dark-border flex flex-wrap items-center justify-between gap-3 bg-notion-light/50 dark:bg-notion-dark-bg/50 backdrop-blur-sm sticky top-0 z-10">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-7 h-7 rounded-lg bg-notion-light-hover dark:bg-notion-dark-hover flex items-center justify-center text-sm font-semibold">
+                    📰
+                </div>
+                <div>
+                    <h1 class="text-sm sm:text-base font-semibold leading-tight flex items-center gap-2">
+                        Noticia del Día
+                        <span id="live-indicator" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                            ● En Vivo
+                        </span>
+                    </h1>
+                    <p class="text-[11px] text-notion-light-muted dark:text-notion-dark-muted" id="last-updated">Actualizado hace un momento</p>
+                </div>
+            </div>
+
+            <!-- Controls: Mode toggle, Search & Refresh -->
+            <div class="flex items-center space-x-1.5 sm:space-x-2">
+                <!-- Search Toggle -->
+                <button id="search-toggle-btn" title="Buscar titulares" class="p-1.5 sm:p-2 rounded-md hover:bg-notion-light-hover dark:hover:bg-notion-dark-hover text-notion-light-muted dark:text-notion-dark-muted transition-colors text-xs sm:text-sm">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </button>
+
+                <!-- Layout Toggle (Grid / List) -->
+                <button id="layout-toggle-btn" title="Cambiar vista" class="p-1.5 sm:p-2 rounded-md hover:bg-notion-light-hover dark:hover:bg-notion-dark-hover text-notion-light-muted dark:text-notion-dark-muted transition-colors text-xs sm:text-sm">
+                    <i id="layout-icon" class="fa-solid fa-border-all"></i>
+                </button>
+
+                <!-- Refresh Button -->
+                <button id="refresh-btn" title="Actualizar noticias" class="p-1.5 sm:p-2 rounded-md hover:bg-notion-light-hover dark:hover:bg-notion-dark-hover text-notion-light-muted dark:text-notion-dark-muted transition-colors text-xs sm:text-sm">
+                    <i id="refresh-icon" class="fa-solid fa-rotate-right"></i>
+                </button>
+
+                <!-- Dark Mode Toggle -->
+                <button id="theme-toggle-btn" title="Cambiar tema" class="p-1.5 sm:p-2 rounded-md hover:bg-notion-light-hover dark:hover:bg-notion-dark-hover text-notion-light-muted dark:text-notion-dark-muted transition-colors text-xs sm:text-sm">
+                    <i id="theme-icon" class="fa-solid fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Search Bar (Hidden by default) -->
+        <div id="search-bar-container" class="hidden border-b border-notion-light-border dark:border-notion-dark-border p-2 bg-notion-light-bg/50 dark:bg-notion-dark/50">
+            <div class="relative">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-notion-light-muted dark:text-notion-dark-muted"></i>
+                <input type="text" id="search-input" placeholder="Buscar titulares o palabras clave..." class="w-full pl-8 pr-8 py-1.5 text-xs rounded-md bg-notion-light dark:bg-notion-dark border border-notion-light-border dark:border-notion-dark-border focus:outline-none focus:ring-1 focus:ring-notion-accent">
+                <button id="clear-search-btn" class="hidden absolute right-2.5 top-2 text-xs text-notion-light-muted dark:text-notion-dark-muted hover:text-notion-light-text dark:hover:text-notion-dark-text">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
+        <nav class="px-3 sm:px-4 py-2 border-b border-notion-light-border dark:border-notion-dark-border flex space-x-1 overflow-x-auto no-scrollbar scroll-smooth text-xs">
+            <button data-category="top" class="category-btn active border border-transparent px-3 py-1 rounded-md font-medium whitespace-nowrap transition-colors bg-notion-light-hover dark:bg-notion-dark-hover text-notion-light-text dark:text-notion-dark-text">
+                🔥 Titulares
+            </button>
+            <button data-category="tech" class="category-btn border border-transparent px-3 py-1 rounded-md font-medium whitespace-nowrap transition-colors hover:bg-notion-light-hover dark:hover:bg-notion-dark-hover text-notion-light-muted dark:text-notion-dark-muted">
+                💻 Tecnología
+            </button>
+            <button data-category="world" class="category-btn border border-transparent px-3 py-1 rounded-md font-medium whitespace-nowrap transition-colors hover:bg-notion-light-hover dark:hover:bg-notion-dark-hover text-notion-light-muted dark:text-notion-dark-muted">
+                🌍 Mundo
+            </button>
+            <button data-category="culture" class="category-btn border border-transparent px-3 py-1 rounded-md font-medium whitespace-nowrap transition-colors hover:bg-notion-light-hover dark:hover:bg-notion-dark-hover text-notion-light-muted dark:text-notion-dark-muted">
+                🎨 Cultura & Ciencia
+            </button>
+            <button data-category="business" class="category-btn border border-transparent px-3 py-1 rounded-md font-medium whitespace-nowrap transition-colors hover:bg-notion-light-hover dark:hover:bg-notion-dark-hover text-notion-light-muted dark:text-notion-dark-muted">
+                📈 Economía
+            </button>
+        </nav>
+
+        <main id="news-container" class="p-3 sm:p-4 flex-grow grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 overflow-y-auto">
+            <!-- Loader State -->
+            <div id="loading-spinner" class="col-span-full py-16 flex flex-col items-center justify-center space-y-3 text-notion-light-muted dark:text-notion-dark-muted">
+                <i class="fa-solid fa-circle-notch fa-spin text-2xl text-notion-accent"></i>
+                <p class="text-xs font-medium">Obteniendo noticias frescas...</p>
+            </div>
+        </main>
+
+        <footer class="px-3 py-2 border-t border-notion-light-border dark:border-notion-dark-border text-[11px] text-notion-light-muted dark:text-notion-dark-muted flex justify-between items-center bg-notion-light-bg/30 dark:bg-notion-dark/30">
+            <span id="source-attribution" class="truncate max-w-[200px] sm:max-w-none">Fuente: RSS Feed activo</span>
+            <div class="flex items-center space-x-2">
+                <span id="article-count">0 noticias</span>
+                <span>•</span>
+                <a href="https://notion.so" target="_blank" class="hover:underline flex items-center gap-1">
+                    Widget Notion <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i>
+                </a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Toast Notification for feedback -->
+    <div id="toast" class="fixed bottom-4 right-4 translate-y-10 opacity-0 transition-all duration-300 pointer-events-none bg-notion-light-text text-notion-light dark:bg-notion-dark-text dark:text-notion-dark px-3 py-2 rounded-lg text-xs shadow-lg flex items-center space-x-2 z-50">
+        <i id="toast-icon" class="fa-solid fa-check text-emerald-400"></i>
+        <span id="toast-message">Copiado al portapapeles</span>
+    </div>
+
+    <script>
+        // RSS Feed Sources configuration using rss2json API
+        const FEEDS = {
+            top: [
+                { name: 'BBC Mundo', url: 'https://feeds.bbci.co.uk/mundo/rss.xml' },
+                { name: 'El País', url: 'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada' }
+            ],
+            tech: [
+                { name: 'Xataka', url: 'https://www.xataka.com/feedburner.xml' },
+                { name: 'TechCrunch', url: 'https://techcrunch.com/feed/' }
+            ],
+            world: [
+                { name: 'BBC World', url: 'https://feeds.bbci.co.uk/news/world/rss.xml' },
+                { name: 'Euronews', url: 'https://es.euronews.com/rss' }
+            ],
+            culture: [
+                { name: 'National Geographic', url: 'https://www.nationalgeographic.com.es/feed/rss' },
+                { name: 'Wired', url: 'https://www.wired.com/feed/rss' }
+            ],
+            business: [
+                { name: 'El Economista', url: 'https://www.eleconomista.es/rss/rss-portada.php' }
+            ]
+        };
+
+        const FALLBACK_NEWS = {
+            top: [
+                {
+                    title: "La Inteligencia Artificial revoluciona la automatización del trabajo cotidiano",
+                    link: "https://news.google.com",
+                    pubDate: new Date(Date.now() - 3600000 * 2).toISOString(),
+                    author: "Tecnología",
+                    thumbnail: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80",
+                    description: "Nuevas herramientas integradas en plataformas de productividad permiten agilizar flujos de trabajo diarios reduciendo hasta un 40% el tiempo en tareas repetitivas.",
+                    source: "Redacción Digital"
+                },
+                {
+                    title: "Avanzan acuerdos mundiales para la conservación y sostenibilidad marina",
+                    link: "https://news.google.com",
+                    pubDate: new Date(Date.now() - 3600000 * 5).toISOString(),
+                    author: "Planeta",
+                    thumbnail: "https://images.unsplash.com/photo-1518837695005-2083093ee35b?w=400&q=80",
+                    description: "Líderes globales se reúnen para ratificar el tratado histórico sobre protección de aguas internacionales y biodiversidad costera.",
+                    source: "Ecológia Global"
+                }
+            ],
+            tech: [
+                {
+                    title: "Nuevos avances en computación cuántica prometen acelerar la investigación médica",
+                    link: "https://news.google.com",
+                    pubDate: new Date(Date.now() - 3600000 * 1).toISOString(),
+                    author: "Tech",
+                    thumbnail: "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&q=80",
+                    description: "Científicos logran simulaciones moleculares complejas en minutos gracias a nuevos procesadores cuánticos de alta fidelidad.",
+                    source: "Tech Daily"
+                }
+            ],
+            world: [
+                {
+                    title: "Exploración espacial: La nueva misión a Marte prepara su lanzamiento",
+                    link: "https://news.google.com",
+                    pubDate: new Date(Date.now() - 3600000 * 8).toISOString(),
+                    author: "Ciencia",
+                    thumbnail: "https://images.unsplash.com/photo-1614728894747-a83421e2b9c9?w=400&q=80",
+                    description: "El rover de última generación buscará rastros de microbios antiguos e investigará depósitos subterráneos de hielo.",
+                    source: "Espacio Hoy"
+                }
+            ],
+            culture: [
+                {
+                    title: "Descubrimiento arqueológico revela detalles inéditos sobre civilizaciones antiguas",
+                    link: "https://news.google.com",
+                    pubDate: new Date(Date.now() - 3600000 * 12).toISOString(),
+                    author: "Cultura",
+                    thumbnail: "https://images.unsplash.com/photo-1564399579883-451a5d44ec08?w=400&q=80",
+                    description: "Hallazgo de textos y artefactos bien conservados aportan nueva luz sobre el comercio e intercambio cultural de la época.",
+                    source: "Cultura Universal"
+                }
+            ],
+            business: [
+                {
+                    title: "Mercados globales muestran resiliencia ante los nuevos indicadores económicos",
+                    link: "https://news.google.com",
+                    pubDate: new Date(Date.now() - 3600000 * 4).toISOString(),
+                    author: "Finanzas",
+                    thumbnail: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&q=80",
+                    description: "Las empresas tecnológicas e industriales impulsan la recuperación en las principales bolsas de valores.",
+                    source: "Mercados & Negocios"
+                }
+            ]
+        };
+
+        const state = {
+            currentCategory: 'top',
+            isCompactLayout: false,
+            articles: [],
+            searchQuery: '',
+            isFallbackMode: false,
+            theme: localStorage.getItem('notion_news_theme') || 'dark'
+        };
+
+        // DOM Elements
+        const newsContainer = document.getElementById('news-container');
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const categoryBtns = document.querySelectorAll('.category-btn');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const refreshIcon = document.getElementById('refresh-icon');
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        const themeIcon = document.getElementById('theme-icon');
+        const layoutToggleBtn = document.getElementById('layout-toggle-btn');
+        const layoutIcon = document.getElementById('layout-icon');
+        const searchToggleBtn = document.getElementById('search-toggle-btn');
+        const searchBarContainer = document.getElementById('search-bar-container');
+        const searchInput = document.getElementById('search-input');
+        const clearSearchBtn = document.getElementById('clear-search-btn');
+        const lastUpdatedEl = document.getElementById('last-updated');
+        const sourceAttribution = document.getElementById('source-attribution');
+        const articleCountEl = document.getElementById('article-count');
+        const liveIndicator = document.getElementById('live-indicator');
+
+        function initTheme() {
+            if (state.theme === 'dark') {
+                document.documentElement.classList.add('dark');
+                themeIcon.className = 'fa-solid fa-sun';
+            } else {
+                document.documentElement.classList.remove('dark');
+                themeIcon.className = 'fa-solid fa-moon';
+            }
+        }
+
+        themeToggleBtn.addEventListener('click', () => {
+            state.theme = state.theme === 'dark' ? 'light' : 'dark';
+            localStorage.setItem('notion_news_theme', state.theme);
+            initTheme();
+        });
+
+        function timeAgo(dateString) {
+            try {
+                const date = new Date(dateString);
+                const now = new Date();
+                const seconds = Math.floor((now - date) / 1000);
+
+                if (isNaN(seconds) || seconds < 0) return 'Hace momento';
+
+                let interval = Math.floor(seconds / 3600);
+                if (interval >= 24) {
+                    const days = Math.floor(interval / 24);
+                    return `hace ${days} d`;
+                }
+                if (interval >= 1) return `hace ${interval} h`;
+                
+                interval = Math.floor(seconds / 60);
+                if (interval >= 1) return `hace ${interval} min`;
+                
+                return 'hace un instante';
+            } catch (e) {
+                return 'Reciente';
+            }
+        }
+
+        function extractImageUrl(item) {
+            if (item.thumbnail && item.thumbnail.startsWith('http')) return item.thumbnail;
+            if (item.enclosure && item.enclosure.link) return item.enclosure.link;
+            
+            // Try extracting from description html
+            if (item.description) {
+                const imgMatch = item.description.match(/<img[^>]+src="([^">]+)"/i);
+                if (imgMatch && imgMatch[1]) return imgMatch[1];
+            }
+
+            // High quality fallback gradient placeholders based on title
+            const fallbackImages = [
+                'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=400&q=80',
+                'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&q=80',
+                'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=400&q=80'
+            ];
+            const index = Math.abs(item.title.length) % fallbackImages.length;
+            return fallbackImages[index];
+        }
+
+        // Clean HTML tags from summary text
+        function cleanSnippet(htmlText) {
+            if (!htmlText) return '';
+            const tmp = document.createElement('DIV');
+            tmp.innerHTML = htmlText;
+            let text = tmp.textContent || tmp.innerText || '';
+            return text.trim();
+        }
+
+        async function fetchNews(category = 'top') {
+            setLoading(true);
+            refreshIcon.classList.add('fa-spin');
+            state.articles = [];
+
+            const feedSources = FEEDS[category] || FEEDS.top;
+            let fetchedItems = [];
+            let isSuccess = false;
+
+            for (const feed of feedSources) {
+                try {
+                    const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`;
+                    const response = await fetch(apiUrl);
+                    
+                    if (!response.ok) throw new Error('Network response error');
+                    
+                    const data = await response.json();
+                    
+                    if (data.status === 'ok' && data.items && data.items.length > 0) {
+                        const items = data.items.map(item => ({
+                            title: item.title,
+                            link: item.link,
+                            pubDate: item.pubDate,
+                            author: item.author || feed.name,
+                            thumbnail: extractImageUrl(item),
+                            description: cleanSnippet(item.description),
+                            source: data.feed.title || feed.name
+                        }));
+                        fetchedItems = [...fetchedItems, ...items];
+                        isSuccess = true;
+                    }
+                } catch (error) {
+                    console.warn(`Error loading feed ${feed.name}:`, error);
+                }
+            }
+
+            if (isSuccess && fetchedItems.length > 0) {
+                // Sort by publication date
+                fetchedItems.sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));
+                state.articles = fetchedItems.slice(0, 12);
+                state.isFallbackMode = false;
+                liveIndicator.className = "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20";
+                liveIndicator.innerHTML = "● En Vivo";
+                sourceAttribution.innerText = `Fuentes: ${feedSources.map(f => f.name).join(', ')}`;
+            } else {
+                // Use Fallback Mock Data
+                console.info('Utilizando noticias de respaldo (Fallback Mode)');
+                state.articles = FALLBACK_NEWS[category] || FALLBACK_NEWS.top;
+                state.isFallbackMode = true;
+                liveIndicator.className = "inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20";
+                liveIndicator.innerHTML = "⚡ Caché local";
+                sourceAttribution.innerText = "Modo sin conexión / Respaldo activo";
+            }
+
+            // Update timestamp
+            const now = new Date();
+            lastUpdatedEl.innerText = `Actualizado: ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+            
+            setLoading(false);
+            refreshIcon.classList.remove('fa-spin');
+            renderArticles();
+        }
+
+        function setLoading(isLoading) {
+            if (isLoading) {
+                newsContainer.innerHTML = '';
+                newsContainer.appendChild(loadingSpinner);
+            }
+        }
+
+        function renderArticles() {
+            let filtered = state.articles;
+
+            // Apply search filter if query exists
+            if (state.searchQuery.trim() !== '') {
+                const query = state.searchQuery.toLowerCase();
+                filtered = filtered.filter(a => 
+                    a.title.toLowerCase().includes(query) || 
+                    a.description.toLowerCase().includes(query)
+                );
+            }
+
+            articleCountEl.innerText = `${filtered.length} noticias`;
+
+            if (filtered.length === 0) {
+                newsContainer.innerHTML = `
+                    <div class="col-span-full py-12 text-center text-notion-light-muted dark:text-notion-dark-muted">
+                        <i class="fa-regular fa-newspaper text-3xl mb-2"></i>
+                        <p class="text-xs font-medium">No se encontraron noticias relacionadas.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            newsContainer.innerHTML = '';
+
+            // Toggle grid classes based on mode
+            if (state.isCompactLayout) {
+                newsContainer.className = "p-3 sm:p-4 flex-grow flex flex-col space-y-2 overflow-y-auto";
+            } else {
+                newsContainer.className = "p-3 sm:p-4 flex-grow grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 overflow-y-auto";
+            }
+
+            filtered.forEach(article => {
+                const card = document.createElement('article');
+                
+                if (state.isCompactLayout) {
+                    // Compact List View
+                    card.className = "group relative p-2.5 rounded-lg border border-notion-light-border dark:border-notion-dark-border bg-notion-light dark:bg-notion-dark-bg hover:border-notion-accent/50 dark:hover:border-notion-accent/50 transition-all duration-150 flex items-center justify-between gap-3 cursor-pointer";
+                    card.onclick = (e) => openArticle(article.link, e);
+                    
+                    card.innerHTML = `
+                        <div class="flex-grow min-w-0">
+                            <div class="flex items-center space-x-2 text-[10px] text-notion-light-muted dark:text-notion-dark-muted mb-1">
+                                <span class="px-1.5 py-0.2 rounded bg-notion-light-hover dark:bg-notion-dark-hover font-medium text-notion-light-text dark:text-notion-dark-text truncate max-w-[100px]">${article.source}</span>
+                                <span>•</span>
+                                <span>${timeAgo(article.pubDate)}</span>
+                            </div>
+                            <h2 class="text-xs font-semibold group-hover:text-notion-accent transition-colors line-clamp-1 leading-snug">
+                                ${article.title}
+                            </h2>
+                        </div>
+                        <div class="flex items-center space-x-1 flex-shrink-0">
+                            <button onclick="copyArticleUrl('${article.link}', event)" title="Copiar enlace" class="p-1 text-notion-light-muted hover:text-notion-light-text dark:text-notion-dark-muted dark:hover:text-notion-dark-text text-xs transition-colors">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                            <i class="fa-solid fa-chevron-right text-[10px] text-notion-light-muted dark:text-notion-dark-muted group-hover:translate-x-0.5 transition-transform"></i>
+                        </div>
+                    `;
+                } else {
+                    // Standard Grid View
+                    card.className = "group relative rounded-lg border border-notion-light-border dark:border-notion-dark-border bg-notion-light dark:bg-notion-dark-bg hover:border-notion-accent/50 dark:hover:border-notion-accent/50 transition-all duration-200 overflow-hidden flex flex-col justify-between cursor-pointer shadow-xs";
+                    card.onclick = (e) => openArticle(article.link, e);
+
+                    card.innerHTML = `
+                        <div>
+                            <!-- Card Image -->
+                            <div class="relative h-32 sm:h-36 w-full overflow-hidden bg-notion-light-hover dark:bg-notion-dark-hover">
+                                <img src="${article.thumbnail}" alt="" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" onerror="this.onerror=null; this.src='https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=400&q=80';">
+                                <div class="absolute top-2 left-2">
+                                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold bg-notion-light/90 dark:bg-notion-dark-bg/90 backdrop-blur-sm text-notion-light-text dark:text-notion-dark-text shadow-xs border border-notion-light-border/50 dark:border-notion-dark-border/50">
+                                        ${article.source}
+                                    </span>
+                                </div>
+                                <button onclick="copyArticleUrl('${article.link}', event)" title="Copiar enlace" class="absolute top-2 right-2 w-7 h-7 rounded-full bg-notion-light/90 dark:bg-notion-dark-bg/90 backdrop-blur-sm flex items-center justify-center text-xs text-notion-light-muted dark:text-notion-dark-muted hover:text-notion-accent transition-colors shadow-xs">
+                                    <i class="fa-regular fa-copy"></i>
+                                </button>
+                            </div>
+
+                            <!-- Card Body -->
+                            <div class="p-3">
+                                <div class="text-[10px] text-notion-light-muted dark:text-notion-dark-muted mb-1 flex items-center space-x-1">
+                                    <i class="fa-regular fa-clock"></i>
+                                    <span>${timeAgo(article.pubDate)}</span>
+                                </div>
+                                <h2 class="text-xs sm:text-sm font-semibold group-hover:text-notion-accent transition-colors line-clamp-2 leading-tight mb-1.5">
+                                    ${article.title}
+                                </h2>
+                                <p class="text-[11px] text-notion-light-muted dark:text-notion-dark-muted line-clamp-2 leading-relaxed">
+                                    ${article.description || 'Haga clic para leer la historia completa en la fuente original.'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Card Footer -->
+                        <div class="px-3 py-2 border-t border-notion-light-border/50 dark:border-notion-dark-border/50 flex items-center justify-between text-[11px] font-medium text-notion-accent">
+                            <span>Leer noticia</span>
+                            <i class="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-1 transition-transform"></i>
+                        </div>
+                    `;
+                }
+
+                newsContainer.appendChild(card);
+            });
+        }
+
+        function openArticle(url, event) {
+            // Prevent opening if copy button was clicked
+            if (event && event.target.closest('button')) return;
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+
+        function copyArticleUrl(url, event) {
+            event.stopPropagation();
+            
+            // Fallback clipboard logic using execCommand as required
+            const tempInput = document.createElement('input');
+            tempInput.value = url;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            
+            try {
+                document.execCommand('copy');
+                showToast('Enlace copiado al portapapeles');
+            } catch (err) {
+                console.error('Error al copiar:', err);
+            }
+            
+            document.body.removeChild(tempInput);
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toast-message');
+            toastMsg.innerText = message;
+            
+            toast.classList.remove('translate-y-10', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-10', 'opacity-0');
+            }, 2500);
+        }
+
+        categoryBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                categoryBtns.forEach(b => {
+                    b.classList.remove('active', 'bg-notion-light-hover', 'dark:bg-notion-dark-hover', 'text-notion-light-text', 'dark:text-notion-dark-text');
+                    b.classList.add('text-notion-light-muted', 'dark:text-notion-dark-muted');
+                });
+                
+                btn.classList.add('active', 'bg-notion-light-hover', 'dark:bg-notion-dark-hover', 'text-notion-light-text', 'dark:text-notion-dark-text');
+                btn.classList.remove('text-notion-light-muted', 'dark:text-notion-dark-muted');
+                
+                state.currentCategory = btn.dataset.category;
+                fetchNews(state.currentCategory);
+            });
+        });
+
+        refreshBtn.addEventListener('click', () => {
+            fetchNews(state.currentCategory);
+        });
+
+        layoutToggleBtn.addEventListener('click', () => {
+            state.isCompactLayout = !state.isCompactLayout;
+            layoutIcon.className = state.isCompactLayout ? 'fa-solid fa-table-cells-large' : 'fa-solid fa-border-all';
+            renderArticles();
+        });
+
+        searchToggleBtn.addEventListener('click', () => {
+            const isHidden = searchBarContainer.classList.contains('hidden');
+            if (isHidden) {
+                searchBarContainer.classList.remove('hidden');
+                searchInput.focus();
+            } else {
+                searchBarContainer.classList.add('hidden');
+                searchInput.value = '';
+                state.searchQuery = '';
+                renderArticles();
+            }
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            state.searchQuery = e.target.value;
+            if (state.searchQuery.length > 0) {
+                clearSearchBtn.classList.remove('hidden');
+            } else {
+                clearSearchBtn.classList.add('hidden');
+            }
+            renderArticles();
+        });
+
+        clearSearchBtn.addEventListener('click', () => {
+            searchInput.value = '';
+            state.searchQuery = '';
+            clearSearchBtn.classList.add('hidden');
+            renderArticles();
+        });
+
+        // Initialize App on load
+        window.onload = function() {
+            initTheme();
+            fetchNews(state.currentCategory);
+        };
+    </script>
+</body>
+</html>
